@@ -1,5 +1,10 @@
 const $ = s => document.querySelector(s);
 
+
+/* =========================
+   ACTIVITY
+========================= */
+
 let activity = [
   ["💡", "Living Room Light", "ON"],
   ["🌀", "Bedroom Fan", "ON"],
@@ -11,6 +16,16 @@ let activity = [
 function render() {
 
   const a = $("#activity");
+
+  if (!activity.length) {
+
+    a.innerHTML =
+      `<p class="empty-log">No activity yet.</p>`;
+
+    return;
+
+  }
+
 
   a.innerHTML = activity
     .map(x =>
@@ -27,14 +42,22 @@ function render() {
 render();
 
 
+/* =========================
+   DEVICE COUNT
+========================= */
+
 function update() {
 
   const n =
     document.querySelectorAll(".switch.on").length;
 
-  $("#count").textContent = `${n} / 9`;
 
-  $("#active").textContent = `${n} active`;
+  $("#count").textContent =
+    `${n} / 9`;
+
+
+  $("#active").textContent =
+    `${n} active`;
 
 }
 
@@ -42,102 +65,388 @@ function update() {
 update();
 
 
-/* DEVICE SWITCHES */
+/* =========================
+   TOAST
+========================= */
 
-document.querySelectorAll(".switch").forEach(s => {
+function toast(message) {
 
-  s.onclick = () => {
+  const x = $("#toast");
 
-    s.classList.toggle("on");
+  x.textContent = message;
 
-    const d =
-      s.closest(".device");
+  x.classList.add("show");
 
-    const st =
-      s.classList.contains("on")
-        ? "ON"
-        : "OFF";
+  setTimeout(
+    () => x.classList.remove("show"),
+    2200
+  );
 
-    activity.unshift([
-      "⚙️",
-      d.dataset.name,
-      st
-    ]);
+}
 
-    activity =
-      activity.slice(0, 6);
 
-    render();
+/* =========================
+   DEVICE SWITCHES
+========================= */
 
-    update();
+document
+  .querySelectorAll(".switch")
+  .forEach(s => {
 
-    toast(
-      `${d.dataset.name} turned ${st}`
-    );
+    s.onclick = () => {
 
-  };
+      s.classList.toggle("on");
+
+
+      const device =
+        s.closest(".device");
+
+
+      const state =
+        s.classList.contains("on")
+          ? "ON"
+          : "OFF";
+
+
+      activity.unshift([
+        "⚙️",
+        device.dataset.name,
+        state
+      ]);
+
+
+      activity =
+        activity.slice(0, 8);
+
+
+      render();
+
+      update();
+
+
+      toast(
+        `${device.dataset.name} turned ${state}`
+      );
+
+    };
+
+  });
+
+
+/* =========================
+   AUTOMATION SYSTEM
+========================= */
+
+const automationRules = {
+
+  temperature: false,
+  humidity: false,
+  night: false,
+  energy: false
+
+};
+
+
+const automationButtons =
+  document.querySelectorAll(
+    ".automation-toggle"
+  );
+
+
+function updateAutomationCount() {
+
+  const active =
+    Object.values(
+      automationRules
+    ).filter(Boolean).length;
+
+
+  $("#automationStatus").textContent =
+    `${active} active rule${active === 1 ? "" : "s"}`;
+
+}
+
+
+updateAutomationCount();
+
+
+automationButtons.forEach(button => {
+
+  button.addEventListener(
+    "click",
+    () => {
+
+      const rule =
+        button.dataset.rule;
+
+
+      automationRules[rule] =
+        !automationRules[rule];
+
+
+      const enabled =
+        automationRules[rule];
+
+
+      button.textContent =
+        enabled
+          ? "ON"
+          : "OFF";
+
+
+      button.classList.toggle(
+        "active",
+        enabled
+      );
+
+
+      updateAutomationCount();
+
+
+      addAutomationLog(
+        enabled
+          ? `Automation enabled: ${rule}`
+          : `Automation disabled: ${rule}`
+      );
+
+
+      toast(
+        enabled
+          ? "Automation rule enabled"
+          : "Automation rule disabled"
+      );
+
+    }
+  );
 
 });
 
 
-/* AUTOMATION SCENES */
+/* =========================
+   AUTOMATION LOG
+========================= */
+
+let automationLog = [];
+
+
+function addAutomationLog(message) {
+
+  const now =
+    new Date().toLocaleTimeString(
+      "en-IN",
+      {
+        hour: "2-digit",
+        minute: "2-digit"
+      }
+    );
+
+
+  automationLog.unshift({
+    message,
+    time: now
+  });
+
+
+  automationLog =
+    automationLog.slice(0, 8);
+
+
+  renderAutomationLog();
+
+}
+
+
+function renderAutomationLog() {
+
+  const box =
+    $("#automationActivity");
+
+
+  if (!automationLog.length) {
+
+    box.innerHTML =
+      `<p class="empty-log">
+        No automation activity yet.
+      </p>`;
+
+    return;
+
+  }
+
+
+  box.innerHTML =
+    automationLog
+      .map(item =>
+        `<div class="item">
+          <b>🤖 ${item.message}</b>
+          <span>${item.time}</span>
+        </div>`
+      )
+      .join("");
+
+}
+
+
+renderAutomationLog();
+
+
+$("#clearAutomation")
+  .addEventListener(
+    "click",
+    () => {
+
+      automationLog = [];
+
+      renderAutomationLog();
+
+      toast(
+        "Automation history cleared"
+      );
+
+    }
+  );
+
+
+/* =========================
+   SMART TEMPERATURE RULE
+========================= */
+
+function runTemperatureAutomation(
+  temperature
+) {
+
+  if (
+    automationRules.temperature &&
+    temperature > 28
+  ) {
+
+    const ac =
+      document.querySelector(
+        '[data-name="Smart AC"] .switch'
+      );
+
+
+    if (!ac.classList.contains("on")) {
+
+      ac.classList.add("on");
+
+      update();
+
+
+      addAutomationLog(
+        `Temperature ${temperature}°C → Smart AC turned ON`
+      );
+
+
+      toast(
+        "Smart AC automatically turned ON"
+      );
+
+    }
+
+  }
+
+}
+
+
+/* =========================
+   SMART HUMIDITY RULE
+========================= */
+
+function runHumidityAutomation(
+  humidity
+) {
+
+  if (
+    automationRules.humidity &&
+    humidity > 70
+  ) {
+
+    const fan =
+      document.querySelector(
+        '[data-name="Bathroom Exhaust Fan"] .switch'
+      );
+
+
+    if (!fan.classList.contains("on")) {
+
+      fan.classList.add("on");
+
+      update();
+
+
+      addAutomationLog(
+        `Humidity ${humidity}% → Bathroom Exhaust Fan ON`
+      );
+
+
+      toast(
+        "Bathroom Exhaust Fan automatically turned ON"
+      );
+
+    }
+
+  }
+
+}
+
+
+/* =========================
+   DEVICE SCENES
+========================= */
 
 document
   .querySelectorAll(".scenes button")
-  .forEach(b => {
+  .forEach(button => {
 
-    b.onclick = () => {
+    button.onclick = () => {
 
-      const n =
-        b.dataset.scene;
+      const scene =
+        button.dataset.scene;
+
 
       const switches =
-        document.querySelectorAll(".switch");
+        document.querySelectorAll(
+          ".switch"
+        );
 
 
-      if (n === "Good Morning") {
+      if (scene === "Good Morning") {
 
-        /*
-          Morning mode:
-          Everything ON except Smart TV
-        */
+        switches.forEach(
+          (x, index) => {
 
-        switches.forEach((x, i) => {
+            if (index !== 1) {
 
-          if (i !== 1) {
-            x.classList.add("on");
+              x.classList.add("on");
+
+            }
+
           }
-
-        });
+        );
 
       }
 
 
-      else if (n === "Movie Time") {
+      else if (scene === "Movie Time") {
 
-        /*
-          Movie mode:
-          Only Smart TV ON
-        */
-
-        switches.forEach(x =>
-          x.classList.remove("on")
+        switches.forEach(
+          x =>
+            x.classList.remove("on")
         );
 
-        switches[1].classList.add("on");
+
+        switches[1]
+          .classList.add("on");
 
       }
 
 
       else {
 
-        /*
-          Away Mode / Good Night:
-          Everything OFF
-        */
-
-        switches.forEach(x =>
-          x.classList.remove("on")
+        switches.forEach(
+          x =>
+            x.classList.remove("on")
         );
 
       }
@@ -148,19 +457,21 @@ document
 
       activity.unshift([
         "⚙️",
-        n,
+        scene,
         "Scene activated"
       ]);
 
 
       activity =
-        activity.slice(0, 6);
+        activity.slice(0, 8);
+
 
       render();
 
 
       toast(
-        n + " scene activated"
+        scene +
+        " scene activated"
       );
 
     };
@@ -168,7 +479,88 @@ document
   });
 
 
-/* CLEAR ACTIVITY */
+/* =========================
+   ROOM FILTER
+========================= */
+
+const roomButtons =
+  document.querySelectorAll(
+    ".room-card"
+  );
+
+
+const deviceCards =
+  document.querySelectorAll(
+    ".device"
+  );
+
+
+roomButtons.forEach(button => {
+
+  button.addEventListener(
+    "click",
+    () => {
+
+      const room =
+        button.dataset.room;
+
+
+      roomButtons.forEach(
+        x =>
+          x.classList.remove(
+            "active"
+          )
+      );
+
+
+      button.classList.add(
+        "active"
+      );
+
+
+      deviceCards.forEach(
+        card => {
+
+          const location =
+            card.querySelector(
+              "small"
+            ).textContent
+             .split(" · ")[0];
+
+
+          card.style.display =
+            (
+              room === "All" ||
+              location === room
+            )
+              ? "block"
+              : "none";
+
+        }
+      );
+
+
+      $("#roomHint").textContent =
+        room === "All"
+          ? "Showing devices from all rooms"
+          : `Showing ${room} devices`;
+
+
+      toast(
+        room === "All"
+          ? "Showing all rooms"
+          : `${room} selected`
+      );
+
+    }
+  );
+
+});
+
+
+/* =========================
+   CLEAR ACTIVITY
+========================= */
 
 $("#clear").onclick = () => {
 
@@ -183,63 +575,67 @@ $("#clear").onclick = () => {
 };
 
 
-/* TOAST */
-
-function toast(t) {
-
-  const x = $("#toast");
-
-  x.textContent = t;
-
-  x.classList.add("show");
-
-  setTimeout(
-    () => x.classList.remove("show"),
-    2000
-  );
-
-}
-
-
-/* DARK / LIGHT MODE */
+/* =========================
+   DARK / LIGHT MODE
+========================= */
 
 $("#theme").onclick = () => {
 
-  document.body.classList.toggle("light");
+  document.body.classList.toggle(
+    "light"
+  );
+
 
   $("#theme").textContent =
-    document.body.classList.contains("light")
+    document.body.classList.contains(
+      "light"
+    )
       ? "🌙"
       : "☀️";
 
+
   localStorage.theme =
-    document.body.classList.contains("light")
+    document.body.classList.contains(
+      "light"
+    )
       ? "light"
       : "dark";
 
 };
 
 
-if (localStorage.theme === "light") {
+if (
+  localStorage.theme === "light"
+) {
 
-  $("body").classList.add("light");
+  $("body")
+    .classList.add("light");
 
-  $("#theme").textContent = "🌙";
+
+  $("#theme").textContent =
+    "🌙";
 
 }
 
 
-/* CLOCK */
+/* =========================
+   CLOCK
+========================= */
 
 function clock() {
 
-  const n = new Date();
+  const now =
+    new Date();
+
 
   $("#time").textContent =
-    n.toLocaleTimeString("en-IN");
+    now.toLocaleTimeString(
+      "en-IN"
+    );
+
 
   $("#date").textContent =
-    n.toLocaleDateString(
+    now.toLocaleDateString(
       "en-IN",
       {
         weekday: "short",
@@ -260,96 +656,65 @@ setInterval(
 );
 
 
-/* SIMULATED SENSOR DATA */
+/* =========================
+   SIMULATED LIVE SENSORS
+========================= */
 
 setInterval(() => {
 
-  const t =
+  const temperature =
     26 +
-    Math.floor(
-      Math.random() * 4
-    );
+    Math.random() * 4;
 
-  const h =
+
+  const humidity =
     58 +
-    Math.floor(
-      Math.random() * 8
-    );
+    Math.random() * 15;
+
+
+  const roundedTemp =
+    temperature.toFixed(1);
+
+
+  const roundedHumidity =
+    Math.round(humidity);
 
 
   $("#temp").textContent =
-    t + "°C";
+    `${roundedTemp}°C`;
+
 
   $("#ct").textContent =
-    t + "°";
+    `${roundedTemp}°`;
+
 
   $("#hum").textContent =
-    h + "%";
-
-}, 5000);
+    `${roundedHumidity}%`;
 
 
-/* ROOM FILTER */
-
-const roomButtons =
-  document.querySelectorAll(".room-card");
-
-const deviceCards =
-  document.querySelectorAll(".device");
+  $("#tempBarValue").textContent =
+    `${roundedTemp}°C`;
 
 
-roomButtons.forEach(btn => {
-
-  btn.addEventListener(
-    "click",
-    () => {
-
-      const room =
-        btn.dataset.room;
+  $("#humBarValue").textContent =
+    `${roundedHumidity}%`;
 
 
-      roomButtons.forEach(x =>
-        x.classList.remove("active")
-      );
+  $("#tempBar").style.width =
+    `${Math.min(100, temperature * 2.5)}%`;
 
 
-      btn.classList.add("active");
+  $("#humBar").style.width =
+    `${roundedHumidity}%`;
 
 
-      deviceCards.forEach(card => {
-
-        const small =
-          card.querySelector("small");
-
-        const cardRoom =
-          small.textContent
-            .split(" · ")[0];
-
-
-        card.style.display =
-          (
-            room === "All" ||
-            cardRoom === room
-          )
-            ? "block"
-            : "none";
-
-      });
-
-
-      $("#roomHint").textContent =
-        room === "All"
-          ? "Showing devices from all rooms"
-          : `Showing ${room} devices`;
-
-
-      toast(
-        room === "All"
-          ? "Showing all rooms"
-          : `${room} selected`
-      );
-
-    }
+  runTemperatureAutomation(
+    temperature
   );
 
-});
+
+  runHumidityAutomation(
+    roundedHumidity
+  );
+
+}, 5000);
